@@ -1,0 +1,56 @@
+---
+# tasks file for jenkins
+- name: excute_some_commands
+  ansible.builtin.shell:
+    cmd: |
+       wget -O /usr/share/keyrings/jenkins-keyring.asc \
+       https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+       echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc]" \
+       https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
+       /etc/apt/sources.list.d/jenkins.list > /dev/null
+  register: check_jenkins 
+  when: ansible_facts['distribution'] == 'Ubuntu'
+
+- name: cache_update
+  ansible.builtin.apt:
+    update-cache: yes
+  when: check_jenkins.changed == true and ansible_facts['distribution'] == 'Ubuntu'
+
+- name: install_java
+  ansible.builtin.apt:
+    name: "{{item}}"
+    state: present
+  loop:
+    - fontconfig
+    - openjdk-17-jre
+  when: ansible_facts['distribution'] == 'Ubuntu'
+ # this notify will trugger the install jenkins handler (func)
+  notify: install_jenkins
+
+#=============================================
+# install jenkins on centos
+- name: excute_some_commands
+  shell:
+    cmd: |
+      wget -O /etc/yum.repos.d/jenkins.repo \
+      https://pkg.jenkins.io/redhat-stable/jenkins.repo
+      rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+  when: ansible_facts['distribution'] == 'Centos'
+
+
+- name: cache_update
+  yum:
+    update_cache: yes
+  when: ansible_facts['distribution'] == 'Centos'
+
+
+- name: install_jenkins
+  yum:
+    name: "{{item}}"
+    state: present
+  loop:
+     - fontconfig
+     - java-17-openjdk
+     - jenkins
+  when: ansible_facts['distribution'] == 'Centos'
+  notify: daemon_reload
